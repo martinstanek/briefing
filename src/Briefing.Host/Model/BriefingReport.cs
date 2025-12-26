@@ -16,7 +16,7 @@ public sealed record BriefingReport
     {
         var sb = new StringBuilder();
         
-        sb.AppendLine($"The telemetry report for : {From:d} - {To:d})");
+        sb.AppendLine($"The telemetry report for : {From:d} - {To:d}");
         sb.AppendLine();
         
         foreach (var environmentReport in EnvironmentReports)
