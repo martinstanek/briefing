@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Azure.Identity;
 using Azure.Monitor.Query;
-using Briefing.Host.Config;
+using Briefing.Host.Configuration;
 using Briefing.Host.Model;
 
 namespace Briefing.Host.Checker;

@@ -2,8 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Briefing.Host.Checker;
-using Briefing.Host.Config;
-using Briefing.Host.Model;
+using Briefing.Host.Configuration;
 
 namespace Briefing.Host;
 
