@@ -12,7 +12,7 @@ public static class Program
     {
         var config = GetCheckerConfig(args);
         var checker = new TelemetryChecker(config);
-        var report = await checker.GetReportAsync(from: DateTime.Now.AddDays(-1), to: DateTime.Now);
+        var report = await checker.GetReportAsync(from: DateTime.Now.AddDays(-2), to: DateTime.Now);
 
         Console.WriteLine(report);
     }
@@ -37,7 +37,8 @@ public static class Program
         {
             WorkspaceId = workspaceId,
             TopExceptionCount = 10,
-            CheckedResponseCodes = [500, 400, 429, 503],
+            CheckedResponseCodes = [500, 400, 404, 429, 503],
+            ListedResponseCodes =  [],
             Environments = environments
         };
 

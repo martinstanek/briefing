@@ -26,16 +26,17 @@ public class TelemetryChecker
         
         foreach (var checkerEnvironment in _configuration.Environments)
         {
-            var failedRequests = await GetRequestsAsync(from, to, checkerEnvironment.CollectorId, _configuration.WorkspaceId);
-            var topEceptions = await GetTopExceptionsAsync(from, to, checkerEnvironment.CollectorId, _configuration.WorkspaceId);
+            var failedRequests = await GetRequestsAsync(from, to, checkerEnvironment.CollectorId, _configuration.WorkspaceId, _configuration.CheckedResponseCodes);
+            var topExceptions = await GetTopExceptionsAsync(from, to, checkerEnvironment.CollectorId, _configuration.WorkspaceId);
             var responsesSummary = GetResponsesSummary(failedRequests, _configuration.CheckedResponseCodes.ToArray());
             var report = new EnvironmentReport
             {
                 ExceptionCount = _configuration.TopExceptionCount,
                 Name = checkerEnvironment.Name,
                 ResponsesSummary = responsesSummary,
-                TopExceptions = topEceptions,
-                TopFailedRequests = failedRequests
+                TopExceptions = topExceptions,
+                TopFailedRequests = failedRequests,
+                ListedStatusCodesDetails = _configuration.ListedResponseCodes
             };
             
             environmentReports.Add(report);
@@ -84,15 +85,21 @@ public class TelemetryChecker
         return topExceptionsList;
     }
 
-    private async Task<IReadOnlyCollection<FailedRequest>> GetRequestsAsync(DateTime from, DateTime to, Guid collectorId, Guid workspaceId)
+    private async Task<IReadOnlyCollection<FailedRequest>> GetRequestsAsync(
+        DateTime from, 
+        DateTime to, 
+        Guid collectorId, 
+        Guid workspaceId, 
+        IReadOnlyCollection<int> checkedResponseCodes)
     {
         var topFailedRequests = new List<FailedRequest>();
+        var checkCodesParam = $"({string.Join(',', checkedResponseCodes)})";
         var failedRequestsQuery = 
             $"""
              AppRequests
              | where ResourceGUID == '{collectorId.ToString()}'
              | where TimeGenerated >= datetime({from:O}) and TimeGenerated <= datetime({to:O})
-             | where ResultCode  in ('503', '400')
+             | where ResultCode  in {checkCodesParam}
              | summarize Count = count() by ResultCode, Url, AppRoleName
              | order by ResultCode, Count
              """;
@@ -106,9 +113,11 @@ public class TelemetryChecker
         {
             foreach (var row in failedRequestsResult.Value.AllTables.FirstOrDefault()?.Rows ?? [])
             {
+                var responseCode  = int.Parse(row[0].ToString() ?? "0");
+
                 var request = new FailedRequest
                 {
-                    ResponseCode = int.Parse(row[0].ToString() ?? "0"),
+                    ResponseCode = responseCode,
                     Url = row[1].ToString() ?? "",
                     App = row[2].ToString() ?? "",
                     Count = int.Parse(row[3].ToString() ?? "0")

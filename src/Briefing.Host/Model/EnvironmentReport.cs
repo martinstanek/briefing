@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace Briefing.Host.Model;
@@ -15,16 +16,23 @@ public sealed record EnvironmentReport
 
     public required ResponseCodesSummary ResponsesSummary { get; init; }
 
+    public IReadOnlyCollection<int> ListedStatusCodesDetails { get; init; } = [];
+
     public override string ToString()
     {
         var sb = new StringBuilder();
         
         sb.AppendLine($"Collector: {Name}");
         sb.AppendLine();
-        sb.AppendLine($"Failed Requests ({ResponsesSummary}):");
+        sb.AppendLine($"Failed Requests: ({ResponsesSummary})");
 
         foreach (var failedRequest in TopFailedRequests)
         {
+            if (!ListedStatusCodesDetails.Contains(failedRequest.ResponseCode))
+            {
+                continue;
+            }
+
             sb.AppendLine($"    {failedRequest.ResponseCode} - {failedRequest.Count}x - {failedRequest.App} - {failedRequest.Url}");
         }
         

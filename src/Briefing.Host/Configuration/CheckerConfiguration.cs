@@ -10,6 +10,8 @@ public sealed record CheckerConfiguration
     public required int TopExceptionCount { get; init; }
 
     public required IReadOnlyCollection<int> CheckedResponseCodes { get; init; }
+    
+    public required IReadOnlyCollection<int> ListedResponseCodes { get; init; }
 
     public required IReadOnlyCollection<CheckerEnvironmentConfiguration> Environments { get; init; }
 }
