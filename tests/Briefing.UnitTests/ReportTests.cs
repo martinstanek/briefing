@@ -1,6 +1,6 @@
+using System.Collections.Generic;
 using Briefing.Host.Model;
 using Xunit;
-using System.Collections.Generic;
 using Shouldly;
 
 namespace Briefing.UnitTests;
