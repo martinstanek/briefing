@@ -22,14 +22,19 @@ public class TelemetryChecker
     
     public async Task<BriefingReport> GetReportAsync(DateTime from, DateTime to)
     {
-        var environmentReports = new List<EnvironmentReport>();
-        
-        foreach (var checkerEnvironment in _configuration.Environments)
+        var environmentReportsTasks = _configuration.Environments.Select(async checkerEnvironment =>
         {
-            var failedRequests = await GetRequestsAsync(from, to, checkerEnvironment.CollectorId, _configuration.WorkspaceId, _configuration.CheckedResponseCodes);
-            var topExceptions = await GetTopExceptionsAsync(from, to, checkerEnvironment.CollectorId, _configuration.WorkspaceId);
-            var responsesSummary = GetResponsesSummary(failedRequests, _configuration.CheckedResponseCodes.ToArray());
-            var report = new EnvironmentReport
+            var failedRequestsTask = GetRequestsAsync(from, to, checkerEnvironment.CollectorId, _configuration.WorkspaceId, _configuration.CheckedResponseCodes);
+            var topExceptionsTask = GetTopExceptionsAsync(from, to, checkerEnvironment.CollectorId, _configuration.WorkspaceId);
+
+            await Task.WhenAll(failedRequestsTask, topExceptionsTask);
+
+            var failedRequests = await failedRequestsTask;
+            var topExceptions = await topExceptionsTask;
+
+            var responsesSummary = GetResponsesSummary(failedRequests, [.. _configuration.CheckedResponseCodes]);
+
+            return new EnvironmentReport
             {
                 ExceptionCount = _configuration.TopExceptionCount,
                 Name = checkerEnvironment.Name,
@@ -38,9 +43,9 @@ public class TelemetryChecker
                 TopFailedRequests = failedRequests,
                 ListedStatusCodesDetails = _configuration.ListedResponseCodes
             };
-            
-            environmentReports.Add(report);
-        }
+        }).ToArray();
+
+        var environmentReports = await Task.WhenAll(environmentReportsTasks);
         
         return new BriefingReport
         {
@@ -59,7 +64,7 @@ public class TelemetryChecker
              | where ResourceGUID == '{collectorId.ToString()}'
              | where TimeGenerated >= datetime({from:O}) and TimeGenerated <= datetime({to:O})
              | summarize Count = count() by ExceptionType
-             | order by Count
+             | order by Count desc
              | take {_configuration.TopExceptionCount}
              """;
             
@@ -68,18 +73,20 @@ public class TelemetryChecker
             exceptionsQuery,
             new QueryTimeRange(from, to));
 
-        if (exceptionsResult.Value.Status == Azure.Monitor.Query.Models.LogsQueryResultStatus.Success)
+        if (exceptionsResult.Value.Status != Azure.Monitor.Query.Models.LogsQueryResultStatus.Success)
         {
-            foreach (var row in exceptionsResult.Value.AllTables.FirstOrDefault()?.Rows ?? [])
+            throw new InvalidOperationException($"Query failed with status: {exceptionsResult.Value.Status}");
+        }
+
+        foreach (var row in exceptionsResult.Value.AllTables.FirstOrDefault()?.Rows ?? [])
+        {
+            var exception = new AppException()
             {
-                var exception = new AppException()
-                {
-                    Count = int.Parse(row[1].ToString() ?? "0"),
-                    Name = row[0].ToString() ?? "Unknown"
-                };
-                    
-                topExceptionsList.Add(exception);
-            }
+                Count = Convert.ToInt32(row[1] ?? 0),
+                Name = row[0]?.ToString() ?? "Unknown"
+            };
+
+            topExceptionsList.Add(exception);
         }
 
         return topExceptionsList;
@@ -101,7 +108,7 @@ public class TelemetryChecker
              | where TimeGenerated >= datetime({from:O}) and TimeGenerated <= datetime({to:O})
              | where ResultCode  in {checkCodesParam}
              | summarize Count = count() by ResultCode, Url, AppRoleName
-             | order by ResultCode, Count
+             | order by ResultCode desc, Count desc
              """;
         
         var failedRequestsResult = await _logsClient.Value.QueryWorkspaceAsync(
@@ -109,22 +116,24 @@ public class TelemetryChecker
             failedRequestsQuery, 
             new QueryTimeRange(from, to));
         
-        if (failedRequestsResult.Value.Status == Azure.Monitor.Query.Models.LogsQueryResultStatus.Success)
+        if (failedRequestsResult.Value.Status != Azure.Monitor.Query.Models.LogsQueryResultStatus.Success)
         {
-            foreach (var row in failedRequestsResult.Value.AllTables.FirstOrDefault()?.Rows ?? [])
-            {
-                var responseCode  = int.Parse(row[0].ToString() ?? "0");
+            throw new InvalidOperationException($"Query failed with status: {failedRequestsResult.Value.Status}");
+        }
 
-                var request = new FailedRequest
-                {
-                    ResponseCode = responseCode,
-                    Url = row[1].ToString() ?? "",
-                    App = row[2].ToString() ?? "",
-                    Count = int.Parse(row[3].ToString() ?? "0")
-                };
-                
-                topFailedRequests.Add(request);
-            }
+        foreach (var row in failedRequestsResult.Value.AllTables.FirstOrDefault()?.Rows ?? [])
+        {
+            var responseCode = Convert.ToInt32(row[0] ?? 0);
+
+            var request = new FailedRequest
+            {
+                ResponseCode = responseCode,
+                Url = row[1]?.ToString() ?? "",
+                App = row[2]?.ToString() ?? "",
+                Count = Convert.ToInt32(row[3] ?? 0)
+            };
+
+            topFailedRequests.Add(request);
         }
 
         return topFailedRequests;

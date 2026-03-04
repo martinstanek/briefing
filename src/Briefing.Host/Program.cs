@@ -38,7 +38,7 @@ public static class Program
             WorkspaceId = workspaceId,
             TopExceptionCount = 10,
             CheckedResponseCodes = [500, 400, 404, 429, 503],
-            ListedResponseCodes =  [],
+            ListedResponseCodes =  [500, 503],
             Environments = environments
         };
 
