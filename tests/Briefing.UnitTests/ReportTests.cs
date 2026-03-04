@@ -1,6 +1,7 @@
 using Briefing.Host.Model;
 using Xunit;
 using System.Collections.Generic;
+using Shouldly;
 
 namespace Briefing.UnitTests;
 
@@ -9,7 +10,6 @@ public class ReportTests
     [Fact]
     public void ResponseCodesSummary_ToString_FormatsCorrectly()
     {
-        // Arrange
         var codes = new Dictionary<int, int>
         {
             [200] = 10,
@@ -17,18 +17,15 @@ public class ReportTests
         };
         var summary = new ResponseCodesSummary { Codes = codes };
 
-        // Act
         var result = summary.ToString();
 
-        // Assert
-        Assert.Contains("HTTP 200 - 10x", result);
-        Assert.Contains("HTTP 404 - 5x", result);
+        result.ShouldContain("HTTP 200 - 10x");
+        result.ShouldContain("HTTP 404 - 5x");
     }
 
     [Fact]
     public void EnvironmentReport_ToString_IncludesDetailsForListedCodes()
     {
-        // Arrange
         var report = new EnvironmentReport
         {
             Name = "TestEnv",
@@ -42,11 +39,9 @@ public class ReportTests
             ListedStatusCodesDetails = [500]
         };
 
-        // Act
         var result = report.ToString();
 
-        // Assert
-        Assert.Contains("500 - 1x - TestApp - http://test.com", result);
-        Assert.DoesNotContain("404 - 2x - TestApp - http://test.com/404", result);
+        result.ShouldContain("500 - 1x - TestApp - http://test.com");
+        result.ShouldNotContain("404 - 2x - TestApp - http://test.com/404");
     }
 }
